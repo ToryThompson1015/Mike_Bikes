@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
@@ -183,7 +183,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     filterBookings();
-  }, [bookings, filters]);
+  }, [bookings, filters, filterBookings]);
 
   const fetchBookings = async () => {
     try {
@@ -197,7 +197,7 @@ const AdminDashboard = () => {
     }
   };
 
-  const filterBookings = () => {
+  const filterBookings = useCallback(() => {
     let filtered = [...bookings];
     
     if (filters.status) {
@@ -216,7 +216,7 @@ const AdminDashboard = () => {
     }
     
     setFilteredBookings(filtered);
-  };
+  }, [bookings, filters]);
 
   const updateBookingStatus = async (bookingId, newStatus) => {
     try {

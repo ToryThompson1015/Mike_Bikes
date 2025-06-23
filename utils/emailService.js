@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 
 // Create transporter
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
@@ -87,7 +87,7 @@ const sendBookingConfirmation = async (booking) => {
 
 // Send notification to admin
 const sendAdminNotification = async (booking) => {
-  const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
+  const adminEmail = process.env.ADMIN_EMAIL || 'clarkkentxxi@gmail.com';
   return await sendEmail(adminEmail, 'adminNotification', booking);
 };
 
