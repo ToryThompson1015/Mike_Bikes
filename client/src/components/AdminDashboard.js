@@ -181,10 +181,6 @@ const AdminDashboard = () => {
     fetchBookings();
   }, []);
 
-  useEffect(() => {
-    filterBookings();
-  }, [bookings, filters, filterBookings]);
-
   const fetchBookings = async () => {
     try {
       const response = await fetch('/api/bookings');
@@ -217,6 +213,10 @@ const AdminDashboard = () => {
     
     setFilteredBookings(filtered);
   }, [bookings, filters]);
+
+  useEffect(() => {
+    filterBookings();
+  }, [filterBookings]);
 
   const updateBookingStatus = async (bookingId, newStatus) => {
     try {

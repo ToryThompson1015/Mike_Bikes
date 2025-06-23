@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { motion } from 'framer-motion';
@@ -269,14 +269,7 @@ const BookingForm = () => {
     return basePrice * (selectedDuration / 60);
   };
 
-  // Fetch available time slots when date changes
-  useEffect(() => {
-    if (selectedDate) {
-      fetchAvailableSlots();
-    }
-  }, [selectedDate, selectedDuration]);
-
-  const fetchAvailableSlots = async () => {
+  const fetchAvailableSlots = useCallback(async () => {
     if (!selectedDate) return;
     
     setLoadingSlots(true);
@@ -290,11 +283,28 @@ const BookingForm = () => {
       setAvailableSlots(response.data.availableSlots);
     } catch (error) {
       console.error('Error fetching available slots:', error);
-      setAvailableSlots([]);
+      // If backend is not available, show default time slots
+      if (error.code === 'ERR_NETWORK' || error.response?.status >= 500) {
+        const defaultSlots = [
+          '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+          '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
+          '15:00', '15:30', '16:00', '16:30', '17:00', '17:30'
+        ];
+        setAvailableSlots(defaultSlots);
+      } else {
+        setAvailableSlots([]);
+      }
     } finally {
       setLoadingSlots(false);
     }
-  };
+  }, [selectedDate, selectedDuration]);
+
+  // Fetch available time slots when date changes
+  useEffect(() => {
+    if (selectedDate) {
+      fetchAvailableSlots();
+    }
+  }, [selectedDate, fetchAvailableSlots]);
 
   const onSubmit = async (data) => {
     if (!selectedDate || !selectedTime) {
@@ -350,7 +360,16 @@ const BookingForm = () => {
       
     } catch (error) {
       console.error('Booking error:', error);
-      const errorMessage = error.response?.data?.message || 'There was an error submitting your booking. Please try again.';
+      let errorMessage = 'There was an error submitting your booking. Please try again.';
+      
+      if (error.code === 'ERR_NETWORK') {
+        errorMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 400) {
+        errorMessage = 'Please check your booking details and try again.';
+      }
+      
       alert(errorMessage);
     } finally {
       setIsSubmitting(false);
