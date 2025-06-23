@@ -1,13 +1,34 @@
 const nodemailer = require('nodemailer');
 
-// Create transporter
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+// Create test account for development (no authentication required)
+let transporter;
+
+// Initialize transporter
+const initializeTransporter = async () => {
+  try {
+    // For development/testing, use Ethereal Email (no real credentials needed)
+    const testAccount = await nodemailer.createTestAccount();
+    
+    transporter = nodemailer.createTransport({
+      host: 'smtp.ethereal.email',
+      port: 587,
+      secure: false, // true for 465, false for other ports
+      auth: {
+        user: testAccount.user,
+        pass: testAccount.pass
+      }
+    });
+    
+    console.log('Email service initialized with test account');
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize email service:', error);
+    return false;
   }
-});
+};
+
+// Initialize on module load
+initializeTransporter();
 
 // Email templates
 const emailTemplates = {
@@ -64,18 +85,33 @@ const sendEmail = async (to, template, data) => {
   try {
     const emailContent = emailTemplates[template](data);
     
+    // Log email content to console for development
+    console.log('\n=== EMAIL WOULD BE SENT ===');
+    console.log('To:', to);
+    console.log('Subject:', emailContent.subject);
+    console.log('Content:', emailContent.html);
+    console.log('===========================\n');
+    
+    if (!transporter) {
+      console.log('Email service not initialized, skipping actual send');
+      return true;
+    }
+    
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: '"Mike\'s Bikes" <noreply@mikesbikes.com>',
       to: to,
       subject: emailContent.subject,
       html: emailContent.html
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent:', info.messageId);
+    console.log('Email sent successfully!');
+    console.log('Message ID:', info.messageId);
+    console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
     return true;
   } catch (error) {
     console.error('Email error:', error);
+    console.log('Email content logged above - check console for details');
     return false;
   }
 };

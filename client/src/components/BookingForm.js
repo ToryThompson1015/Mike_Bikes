@@ -332,6 +332,7 @@ const BookingForm = () => {
         date: selectedDate,
         time: selectedTime,
         duration: selectedDuration,
+        price: calculatePrice(),
         location: {
           address: data.address,
           coordinates: { lat: 0, lng: 0 } // Would be set by geocoding
