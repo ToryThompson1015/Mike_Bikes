@@ -171,21 +171,84 @@ const SuccessMessage = styled(motion.div)`
   margin-bottom: 20px;
 `;
 
+const DurationSelector = styled.div`
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+`;
+
+const DurationOption = styled.button`
+  padding: 8px 16px;
+  border: 2px solid ${props => props.selected ? '#1a1a1a' : '#e0e0e0'};
+  border-radius: 6px;
+  background: ${props => props.selected ? '#1a1a1a' : '#ffffff'};
+  color: ${props => props.selected ? '#ffffff' : '#1a1a1a'};
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+  
+  &:hover {
+    border-color: #1a1a1a;
+  }
+`;
+
+const PriceDisplay = styled.div`
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  text-align: center;
+  margin-top: 10px;
+  
+  .price {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1a1a1a;
+  }
+  
+  .duration {
+    color: #666666;
+    font-size: 0.9rem;
+  }
+`;
+
+const ConfirmationCode = styled.div`
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 15px;
+  border-radius: 8px;
+  text-align: center;
+  margin-top: 15px;
+  font-weight: 600;
+`;
+
+const LoadingSpinner = styled.div`
+  text-align: center;
+  padding: 20px;
+  color: #666666;
+`;
+
 const BookingForm = () => {
   const [searchParams] = useSearchParams();
   const [serviceType, setServiceType] = useState('');
   const [lessonType, setLessonType] = useState('');
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState('');
+  const [selectedDuration, setSelectedDuration] = useState(60);
+  const [availableSlots, setAvailableSlots] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [confirmationCode, setConfirmationCode] = useState('');
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-    reset
+    reset,
+    watch
   } = useForm();
+
+  const watchServiceType = watch('serviceType');
 
   const timeSlots = [
     '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
@@ -204,9 +267,56 @@ const BookingForm = () => {
     }
   }, [searchParams]);
 
+  // Calculate price based on service type and duration
+  const calculatePrice = () => {
+    const basePrices = {
+      'motorcycle-lesson': 75,
+      'transportation-pickup': 50
+    };
+    const basePrice = basePrices[serviceType] || 50;
+    return basePrice * (selectedDuration / 60);
+  };
+
+  // Fetch available time slots when date changes
+  useEffect(() => {
+    if (selectedDate) {
+      fetchAvailableSlots();
+    }
+  }, [selectedDate, selectedDuration]);
+
+  const fetchAvailableSlots = async () => {
+    if (!selectedDate) return;
+    
+    setLoadingSlots(true);
+    try {
+      const response = await axios.get('/api/bookings/available-slots', {
+        params: {
+          date: selectedDate.toISOString().split('T')[0],
+          duration: selectedDuration
+        }
+      });
+      setAvailableSlots(response.data.availableSlots);
+    } catch (error) {
+      console.error('Error fetching available slots:', error);
+      setAvailableSlots([]);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
   const onSubmit = async (data) => {
     if (!selectedDate || !selectedTime) {
       alert('Please select a date and time');
+      return;
+    }
+
+    if (!serviceType) {
+      alert('Please select a service type');
+      return;
+    }
+
+    if (serviceType === 'motorcycle-lesson' && !lessonType) {
+      alert('Please select a lesson type');
       return;
     }
 
@@ -219,29 +329,48 @@ const BookingForm = () => {
         lessonType: serviceType === 'motorcycle-lesson' ? lessonType : undefined,
         date: selectedDate,
         time: selectedTime,
+        duration: selectedDuration,
         location: {
           address: data.address,
           coordinates: { lat: 0, lng: 0 } // Would be set by geocoding
-        }
+        },
+        pickupDetails: serviceType === 'transportation-pickup' ? {
+          from: data.pickupDetails?.from || '',
+          to: data.pickupDetails?.to || ''
+        } : undefined
       };
 
-      await axios.post('/api/bookings', bookingData);
+      const response = await axios.post('/api/bookings', bookingData);
+      
+      setConfirmationCode(response.data.confirmationCode);
       setSubmitSuccess(true);
       reset();
       setSelectedDate(null);
       setSelectedTime('');
+      setSelectedDuration(60);
+      setAvailableSlots([]);
       
-      // Reset form after 3 seconds
+      // Reset form after 5 seconds
       setTimeout(() => {
         setSubmitSuccess(false);
-      }, 3000);
+        setConfirmationCode('');
+      }, 5000);
       
     } catch (error) {
       console.error('Booking error:', error);
-      alert('There was an error submitting your booking. Please try again.');
+      const errorMessage = error.response?.data?.message || 'There was an error submitting your booking. Please try again.';
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const formatTimeSlot = (time) => {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+    return `${displayHour}:${minutes} ${ampm}`;
   };
 
   return (
@@ -276,6 +405,11 @@ const BookingForm = () => {
             >
               <h3>Booking Submitted Successfully!</h3>
               <p>We'll contact you soon to confirm your appointment.</p>
+              {confirmationCode && (
+                <ConfirmationCode>
+                  Confirmation Code: {confirmationCode}
+                </ConfirmationCode>
+              )}
             </SuccessMessage>
           )}
 
@@ -315,6 +449,27 @@ const BookingForm = () => {
                 )}
               </FormGroup>
             )}
+
+            <FormGroup>
+              <label>Duration</label>
+              <DurationSelector>
+                {[30, 60, 90, 120].map(duration => (
+                  <DurationOption
+                    key={duration}
+                    selected={selectedDuration === duration}
+                    onClick={() => setSelectedDuration(duration)}
+                  >
+                    {duration} min
+                  </DurationOption>
+                ))}
+              </DurationSelector>
+              {serviceType && (
+                <PriceDisplay>
+                  <div className="price">${calculatePrice()}</div>
+                  <div className="duration">{selectedDuration} minute session</div>
+                </PriceDisplay>
+              )}
+            </FormGroup>
 
             <FormGroup>
               <label>Full Name</label>
@@ -392,18 +547,32 @@ const BookingForm = () => {
 
             <FormGroup>
               <label>Preferred Time</label>
-              <TimeSlotSelector>
-                {timeSlots.map((time) => (
-                  <TimeSlot
-                    key={time}
-                    type="button"
-                    selected={selectedTime === time}
-                    onClick={() => setSelectedTime(time)}
-                  >
-                    {time}
-                  </TimeSlot>
-                ))}
-              </TimeSlotSelector>
+              {loadingSlots ? (
+                <LoadingSpinner>Loading available times...</LoadingSpinner>
+              ) : selectedDate ? (
+                <TimeSlotSelector>
+                  {availableSlots.map((time) => (
+                    <TimeSlot
+                      key={time}
+                      type="button"
+                      selected={selectedTime === time}
+                      available={true}
+                      onClick={() => setSelectedTime(time)}
+                    >
+                      {formatTimeSlot(time)}
+                    </TimeSlot>
+                  ))}
+                  {availableSlots.length === 0 && (
+                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#666666' }}>
+                      No available slots for this date. Please select another date.
+                    </div>
+                  )}
+                </TimeSlotSelector>
+              ) : (
+                <div style={{ color: '#666666', textAlign: 'center' }}>
+                  Please select a date first
+                </div>
+              )}
             </FormGroup>
 
             {serviceType === 'transportation-pickup' && (

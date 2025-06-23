@@ -30,6 +30,11 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  duration: {
+    type: Number,
+    default: 60, // minutes
+    enum: [30, 60, 90, 120]
+  },
   location: {
     address: {
       type: String,
@@ -59,10 +64,58 @@ const bookingSchema = new mongoose.Schema({
     enum: ['pending', 'confirmed', 'completed', 'cancelled'],
     default: 'pending'
   },
+  confirmationCode: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'refunded'],
+    default: 'pending'
+  },
+  price: {
+    type: Number,
+    required: true
+  },
+  instructor: {
+    type: String,
+    default: 'Mike'
+  },
+  notes: {
+    type: String,
+    trim: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
   }
+});
+
+// Generate confirmation code before saving
+bookingSchema.pre('save', function(next) {
+  if (!this.confirmationCode) {
+    this.confirmationCode = 'MB' + Date.now().toString().slice(-6) + Math.random().toString(36).substr(2, 3).toUpperCase();
+  }
+  this.updatedAt = Date.now();
+  next();
+});
+
+// Calculate price based on service type and duration
+bookingSchema.pre('save', function(next) {
+  if (!this.price) {
+    const basePrices = {
+      'motorcycle-lesson': 75,
+      'transportation-pickup': 50
+    };
+    const basePrice = basePrices[this.serviceType] || 50;
+    this.price = basePrice * (this.duration / 60);
+  }
+  next();
 });
 
 module.exports = mongoose.model('Booking', bookingSchema); 

@@ -8,6 +8,9 @@ import About from './pages/About';
 import TransportationRequests from './pages/TransportationRequests';
 import BeginnerLessons from './pages/BeginnerLessons';
 import BookingForm from './components/BookingForm';
+import AdminDashboard from './components/AdminDashboard';
+import AdminLogin from './components/AdminLogin';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
@@ -24,6 +27,15 @@ function App() {
           <Route path="/transportation" element={<TransportationRequests />} />
           <Route path="/lessons" element={<BeginnerLessons />} />
           <Route path="/book" element={<BookingForm />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
         </Routes>
       </motion.main>
       <Footer />
